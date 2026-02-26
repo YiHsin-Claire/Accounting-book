@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多專案記帳系統</title>
+    <title>旅遊記帳 (含支付方式)</title>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -68,7 +68,7 @@
         }
 
         .add-project-btn {
-            background-color: #10b981; /* 綠色 */
+            background-color: #10b981;
             color: white;
             border: none;
             border-radius: 6px;
@@ -196,6 +196,7 @@
             gap: 15px;
         }
 
+        /* 類別標籤 */
         .category-tag {
             font-size: 0.75rem;
             padding: 4px 10px;
@@ -207,7 +208,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
-        /* 類別顏色 */
         .tag-食 { background-color: #f59e0b; }
         .tag-衣 { background-color: #ec4899; }
         .tag-住 { background-color: #8b5cf6; }
@@ -232,11 +232,39 @@
             margin-top: 4px;
         }
 
+        /* 支付方式標籤 */
+        .method-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 8px;
+            border: 1px solid;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .method-cash {
+            color: #059669; /* 綠色 */
+            border-color: #34d399;
+            background-color: #ecfdf5;
+        }
+
+        .method-card {
+            color: #2563eb; /* 藍色 */
+            border-color: #60a5fa;
+            background-color: #eff6ff;
+        }
+
+        .item-right {
+            display: flex;
+            align-items: center;
+        }
+
         .amount {
             font-weight: bold;
             font-size: 1.1rem;
-            margin-right: 15px;
-            min-width: 70px;
+            margin-right: 10px;
+            min-width: 60px;
             text-align: right;
         }
 
@@ -262,7 +290,7 @@
         <div class="project-select-group">
             <span class="project-label">目前帳本：</span>
             <select id="project-select" onchange="switchProject()">
-                </select>
+            </select>
             <button class="add-project-btn" onclick="addNewProject()" title="新增專案">＋</button>
         </div>
     </div>
@@ -293,7 +321,14 @@
             </div>
             
             <input type="text" id="text" placeholder="項目名稱 (例如：迪士尼門票)" required>
-            <input type="number" id="amount" placeholder="金額 (負數為支出，正數為收入)" required>
+
+            <div class="row-input">
+                <select id="method" style="flex:1">
+                    <option value="cash">💵 現金</option>
+                    <option value="card">💳 刷卡</option>
+                </select>
+                <input type="number" id="amount" placeholder="金額 (負數為支出)" required style="flex:2">
+            </div>
             
             <button class="submit-btn" type="submit">加入紀錄</button>
         </form>
@@ -301,7 +336,7 @@
 
     <h3>交易明細</h3>
     <ul id="list" class="history-list">
-        </ul>
+    </ul>
 </div>
 
 <script>
@@ -316,34 +351,29 @@
     const category = document.getElementById('category');
     const dateInput = document.getElementById('date');
     const projectSelect = document.getElementById('project-select');
+    const methodSelect = document.getElementById('method'); // 新增
 
     // 初始化日期
     dateInput.valueAsDate = new Date();
 
     // --- 資料結構 ---
-    // 1. 交易紀錄 (新增 project 欄位)
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-    
-    // 2. 專案列表 (字串陣列)
     let projects = JSON.parse(localStorage.getItem('projects')) || ['日常帳務'];
-    
-    // 3. 目前選中的專案
     let currentProject = localStorage.getItem('currentProject') || '日常帳務';
 
     // --- 初始化 ---
-    // 檢查舊資料：如果舊資料沒有 project 欄位，預設歸類為「日常帳務」
     transactions = transactions.map(t => {
         if (!t.project) t.project = '日常帳務';
+        // 舊資料沒有 method 欄位，預設為 cash
+        if (!t.method) t.method = 'cash'; 
         return t;
     });
 
-    // 啟動應用程式
     renderProjectSelect();
     init();
 
     // --- 核心功能 ---
 
-    // 1. 新增專案
     function addNewProject() {
         const projectName = prompt("請輸入新專案名稱 (例如：2026香港旅遊)：");
         if (projectName && projectName.trim() !== "") {
@@ -354,7 +384,6 @@
             projects.push(projectName);
             localStorage.setItem('projects', JSON.stringify(projects));
             
-            // 自動切換到新專案
             currentProject = projectName;
             localStorage.setItem('currentProject', currentProject);
             
@@ -363,14 +392,12 @@
         }
     }
 
-    // 2. 切換專案
     function switchProject() {
         currentProject = projectSelect.value;
         localStorage.setItem('currentProject', currentProject);
         init();
     }
 
-    // 3. 渲染專案選單
     function renderProjectSelect() {
         projectSelect.innerHTML = '';
         projects.forEach(p => {
@@ -382,7 +409,6 @@
         });
     }
 
-    // 4. 新增交易
     function addTransaction(e) {
         e.preventDefault();
 
@@ -393,9 +419,10 @@
 
         const transaction = {
             id: generateID(),
-            project: currentProject, // 標記屬於當前專案
+            project: currentProject,
             date: dateInput.value,
             category: category.value,
+            method: methodSelect.value, // 儲存支付方式
             text: text.value,
             amount: +amount.value
         };
@@ -407,9 +434,9 @@
         text.value = '';
         amount.value = '';
         dateInput.valueAsDate = new Date();
+        // methodSelect.value = 'cash'; // 可選擇是否重置回現金
     }
 
-    // 5. 刪除交易
     function removeTransaction(id) {
         if(confirm('確定要刪除這筆紀錄嗎？')) {
             transactions = transactions.filter(transaction => transaction.id !== id);
@@ -418,24 +445,18 @@
         }
     }
 
-    // 6. 更新畫面 (只顯示當前專案的資料)
     function init() {
         list.innerHTML = '';
         
-        // 過濾出屬於目前專案的交易
         const projectTransactions = transactions.filter(t => t.project === currentProject);
-        
-        // 依日期排序 (新到舊)
         projectTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // 渲染列表
         if (projectTransactions.length === 0) {
             list.innerHTML = '<li style="text-align:center; color:#9ca3af; padding:20px;">本專案尚無紀錄</li>';
         } else {
             projectTransactions.forEach(addTransactionDOM);
         }
 
-        // 更新餘額
         updateValues(projectTransactions);
     }
 
@@ -443,6 +464,11 @@
         const sign = transaction.amount < 0 ? '-' : '+';
         const item = document.createElement('li');
         const cat = transaction.category || '其他';
+        const method = transaction.method || 'cash'; // 讀取支付方式
+
+        // 設定支付方式的顯示文字與樣式
+        const methodText = method === 'cash' ? '💵 現金' : '💳 刷卡';
+        const methodClass = method === 'cash' ? 'method-cash' : 'method-card';
 
         item.classList.add('history-item');
 
@@ -454,7 +480,8 @@
                     <span class="item-date">${transaction.date}</span>
                 </div>
             </div>
-            <div style="display:flex; align-items:center;">
+            <div class="item-right">
+                <span class="method-badge ${methodClass}">${methodText}</span>
                 <span class="amount ${transaction.amount < 0 ? 'expense' : 'income'}">
                     ${sign}${Math.abs(transaction.amount)}
                 </span>
@@ -482,7 +509,6 @@
         money_minus.innerText = `-$${expense}`;
     }
 
-    // 工具函式
     function generateID() {
         return Math.floor(Math.random() * 100000000);
     }
@@ -491,7 +517,6 @@
         localStorage.setItem('transactions', JSON.stringify(transactions));
     }
 
-    // 事件監聽
     form.addEventListener('submit', addTransaction);
 
 </script>
